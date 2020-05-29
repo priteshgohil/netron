@@ -1,0 +1,78 @@
+
+name: Build
+
+on: push
+
+jobs:
+  release:
+    runs-on: ${{ matrix.os }}
+
+    strategy:
+      max-parallel: 6
+      matrix:
+        os: [ ubuntu-latest, macos-latest, windows-latest ]
+
+    steps:
+      - name: Check out Git repository
+        uses: actions/checkout@v1
+
+      - name: Install Hub
+        uses: geertvdc/setup-hub@master
+        with:
+          version: 2.14.2
+
+      - name: Install Node.js
+        uses: actions/setup-node@v1
+        with:
+          node-version: 12
+
+      - name: ESLint
+        run: |
+          npx eslint src/*.js test/*.js
+
+      - if: startsWith(matrix.os, 'ubuntu')
+        name: Install Snapcraft
+        uses: samuelmeuli/action-snapcraft@v1
+        with:
+          snapcraft_token: ${{ secrets.snapcraft_token }}
+
+      - if: startsWith(matrix.os, 'macos')
+        name: Prepare macOS notarization 
+        run: |
+          mkdir -p ~/.private_keys
+          echo '${{ secrets.mac_api_key }}' > ~/.private_keys/AuthKey_${{ secrets.mac_api_key_id }}.p8
+
+      - name: Build Electron app
+        uses: samuelmeuli/action-electron-builder@v1
+        with:
+          github_token: ${{ secrets.github_token }}
+          mac_certs: ${{ secrets.mac_certs }}
+          mac_certs_password: ${{ secrets.mac_certs_password }}
+          release: ${{ startsWith(github.ref, 'refs/tags/v') }}
+        env:
+          API_KEY_ID: ${{ secrets.mac_api_key_id }}
+          API_KEY_ISSUER_ID: ${{ secrets.mac_api_key_issuer_id }}
+
+      - name: Install Python 3.7 
+        uses: actions/setup-python@v2
+        with:
+          python-version: 3.7
+
+      - name: Build Python Server
+        run: |
+          pip3 install wheel
+          python3 ./setup.py build --version bdist_wheel
+
+      - name: Publish Python Server
+        if: startsWith(matrix.os, 'ubuntu') && startsWith(github.event.ref, 'refs/tags')
+        uses: pypa/gh-action-pypi-publish@master
+        with:
+          user: __token__
+          password: ${{ secrets.pypi_api_token }}
+
+      # - if: startsWith(matrix.os, 'ubuntu')
+      #   name: Publish GitHub Pages
+      #   run: |
+      #     make publish_github_pages
+      #   env:
+      #     GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

@@ -71,9 +71,8 @@ start:
 publish_python:
 	@[ -d node_modules ] || npm install
 	python3 ./setup.py build --version bdist_wheel
-	python3 -m pip install --user keyring
 	python3 -m pip install --user twine
-	twine upload dist/dist/*
+	python3 -m twine upload --non-interactive --skip-existing --verbose dist/dist/*
 
 publish_github_electron:
 	@[ -d node_modules ] || npm install
@@ -87,7 +86,7 @@ publish_github_pages:
 	@[ -d node_modules ] || npm install
 	python3 ./setup.py build --version
 	rm -rf ./dist/gh-pages
-	git clone git@github.com:lutzroeder/netron.git ./dist/gh-pages --branch gh-pages
+	hub clone netron ./dist/gh-pages --branch gh-pages
 	rm -rf ./dist/gh-pages/*
 	cp -R ./dist/lib/netron/* ./dist/gh-pages/
 	rm -rf ./dist/gh-pages/*.py*
